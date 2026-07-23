@@ -1,0 +1,40 @@
+name: Process A101 Product Queue
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "7,22,37,52 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: a101-product-lookup-queue
+  cancel-in-progress: false
+
+jobs:
+  process-one:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependency
+        run: pip install requests
+
+      - name: Validate worker
+        run: python -m py_compile scripts/process_a101_lookup_queue.py
+
+      - name: Process one queued product
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          PARSE_API_KEY: ${{ secrets.PARSE_API_KEY }}
+          A101_STORE_ID: ${{ secrets.A101_STORE_ID }}
+        run: python scripts/process_a101_lookup_queue.py
