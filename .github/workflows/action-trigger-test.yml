@@ -1,0 +1,26 @@
+name: Action Trigger Test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "action-trigger.txt"
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Write proof
+        run: |
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > data/action-test.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/action-test.txt
+          git commit -m "Actions tetik testini doğrula"
+          git push origin HEAD:main
