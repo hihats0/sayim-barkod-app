@@ -1,0 +1,20 @@
+checked_at=2026-07-23T20:07:32Z
+HTTP/2 200 
+date: Thu, 23 Jul 2026 20:07:33 GMT
+content-type: application/json
+content-length: 326
+server: cloudflare
+nel: {"report_to":"cf-nel","success_fraction":0.0,"max_age":604800}
+access-control-allow-origin: *
+access-control-allow-credentials: true
+via: 1.1 google
+report-to: {"group":"cf-nel","max_age":604800,"endpoints":[{"url":"https://a.nel.cloudflare.com/report/v4?s=PBl7JzcI1H%2BuH46V1WHQlJtGPctaaqpz08DOksnIhZ0Zseym3LSfC9I9PSJAl6jjjbvJCyydGT7xMvY9Yvtxdvoj46R0T3nf64sEqyOkF4mbfZvn3vvafB7FjuOvJDCxihwjfiO7iw%3D%3D"}]}
+accept-ranges: bytes
+last-modified: Thu, 23 Jul 2026 20:07:33 GMT
+cache-control: max-age=3600
+cf-cache-status: MISS
+cf-ray: a1fd4fdc9874d46b-IAD
+
+
+body_prefix=
+{"res":[],"query":{"q":"fairy","expanded_query":"fairy","processed_query":"fairy","sc_source_query":"fairy","prechecked_dictionary_query":"fairy","org_query":"fairy"},"ai_sc":{"type":"showing_results_for","value":"fairy"},"default_banner":[],"static_content_results":{},"facet_fields":[],"total_item_
