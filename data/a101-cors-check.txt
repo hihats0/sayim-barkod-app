@@ -1,30 +1,47 @@
-{
-  "checkedAt": "2026-07-23T20:13:13.467623+00:00",
-  "barcode": "8006540335925",
-  "sources": {
-    "openproductsfacts": {
-      "error": "HTTPError: HTTP Error 404: Not Found"
-    },
-    "openfoodfacts": {
-      "error": "HTTPError: HTTP Error 404: Not Found"
-    },
-    "upcitemdb": {
-      "status": 200,
-      "allowOrigin": "https://www.upcitemdb.com",
-      "contentType": "application/json; charset=utf-8",
-      "containsBarcode": false,
-      "containsFairy": false,
-      "containsA101ProductUrl": false,
-      "prefix": "{\"code\":\"OK\",\"total\":0,\"offset\":0,\"items\":[]}"
-    },
-    "a101_jina_name_search": {
-      "status": 200,
-      "allowOrigin": "https://hihats0.github.io",
-      "contentType": "text/plain; charset=utf-8",
-      "containsBarcode": false,
-      "containsFairy": true,
-      "containsA101ProductUrl": true,
-      "prefix": "Title: Just a moment...\n\nURL Source: http://www.a101.com.tr/kapida/search?query=Fairy%20S%C4%B1v%C4%B1%20Bula%C5%9F%C4%B1k%20Deterjan%C4%B1%202600%20ml\n\nWarning: This page maybe requiring CAPTCHA, please make sure you are authorized to access this page.\n\nMarkdown Content:\n![Image 1: Icon for www.a101.com.tr](http://www.a101.com.tr/favicon.ico)\n\n## www.a101.com.tr\n\n## Performing security verification\n\nThis website uses a security service to protect against malicious bots. This page is displayed while the website verifies you are not a bot.\n"
-    }
-  }
-}
+checked_at=2026-07-23T20:26:00Z
+preflight:
+HTTP/2 200 
+date: Thu, 23 Jul 2026 20:26:01 GMT
+content-type: text/plain; charset=utf-8
+content-length: 2
+access-control-allow-headers: x-api-key
+access-control-allow-methods: DELETE, GET, HEAD, OPTIONS, PATCH, POST, PUT
+access-control-allow-origin: *
+access-control-max-age: 600
+cache-control: no-store
+permissions-policy: camera=(), microphone=(), geolocation=()
+referrer-policy: strict-origin-when-cross-origin
+server: cloudflare
+strict-transport-security: max-age=31536000; includeSubDomains
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-railway-request-id: pHUoSNDcQQy8Besi-_9nXA
+x-service: fastapi
+x-hikari-trace: jfk1.57w5
+x-railway-edge: jfk1
+cf-cache-status: DYNAMIC
+cf-ray: a1fd6aea0ad71625-IAD
+
+OK
+no_key_get:
+HTTP/2 401 
+date: Thu, 23 Jul 2026 20:26:02 GMT
+content-type: application/json
+content-length: 54
+access-control-allow-origin: *
+access-control-expose-headers: X-Service, X-Credits-Charged, X-Credits-Remaining, X-Credits-Limit, WWW-Authenticate, X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset, X-RateLimit-Burst, X-RateLimit-Refill-Per-Min, X-RateLimit-Daily-Limit, X-RateLimit-Daily-Remaining, X-RateLimit-Daily-Reset, Retry-After
+cache-control: no-store
+permissions-policy: camera=(), microphone=(), geolocation=()
+referrer-policy: strict-origin-when-cross-origin
+server: cloudflare
+strict-transport-security: max-age=31536000; includeSubDomains
+x-content-type-options: nosniff
+x-frame-options: DENY
+x-railway-request-id: 3X2hgEfwSp-qJSiOljLL4A
+x-service: fastapi
+x-hikari-trace: jfk1.aghq
+x-railway-edge: jfk1
+cf-cache-status: DYNAMIC
+cf-ray: a1fd6aef9899d6ed-IAD
+
+{"error":"Missing X-API-Key header","status_code":401}
