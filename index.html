@@ -7,7 +7,7 @@
   <meta name="description" content="Telefondan barkod okutarak ortak stok sayımı yapın." />
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=2" />
   <title>Sayım Barkod</title>
 </head>
 <body>
@@ -46,7 +46,7 @@
         <form id="barcodeForm" class="inline-form">
           <label class="sr-only" for="barcodeInput">Barkod numarası</label>
           <input id="barcodeInput" inputmode="numeric" autocomplete="off" placeholder="869... barkod numarası" maxlength="18" />
-          <button type="submit" class="primary-button">Ara</button>
+          <button type="submit" class="primary-button">A101’de ara</button>
         </form>
       </article>
 
@@ -138,6 +138,7 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./app.js" defer></script>
+  <script src="./app.js?v=2" defer></script>
+  <script src="./lookup-fix.js?v=2" defer></script>
 </body>
 </html>
