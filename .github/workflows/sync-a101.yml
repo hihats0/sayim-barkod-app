@@ -8,6 +8,7 @@ on:
     branches: [main]
     paths:
       - "scripts/sync_a101_catalog.py"
+      - "scripts/sync_a101_catalog_fast.py"
       - ".github/workflows/sync-a101.yml"
 
 permissions:
@@ -15,12 +16,12 @@ permissions:
 
 concurrency:
   group: a101-catalog-sync
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 45
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,13 +37,18 @@ jobs:
       - name: Install scraper dependencies
         run: pip install requests beautifulsoup4
 
+      - name: Check scraper syntax
+        run: python -m py_compile scripts/sync_a101_catalog.py scripts/sync_a101_catalog_fast.py
+
       - name: Build A101 catalog
         env:
           PARSE_API_KEY: ${{ secrets.PARSE_API_KEY }}
-          A101_REQUEST_DELAY: "0.65"
-          A101_MAX_PRODUCTS: "12000"
-          A101_MAX_LISTING_PAGES: "750"
-        run: python scripts/sync_a101_catalog.py
+          A101_REQUEST_DELAY: "0.55"
+          A101_MAX_PRODUCTS: "15000"
+          A101_MAX_LISTING_PAGES: "180"
+          A101_WAW_DELAY: "0.40"
+          A101_WAW_MAX_PAGES: "60"
+        run: python scripts/sync_a101_catalog_fast.py
 
       - name: Validate generated JSON
         run: |
@@ -51,8 +57,11 @@ jobs:
           from pathlib import Path
           path = Path("data/a101-products.json")
           data = json.loads(path.read_text(encoding="utf-8"))
-          assert isinstance(data.get("products"), list)
+          products = data.get("products")
+          assert isinstance(products, list)
+          assert isinstance(data.get("metadata"), dict)
           print(json.dumps(data.get("metadata", {}), ensure_ascii=False, indent=2))
+          print(f"product_count={len(products)}")
           PY
 
       - name: Commit refreshed catalog
