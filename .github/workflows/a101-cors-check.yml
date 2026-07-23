@@ -1,0 +1,36 @@
+name: A101 CORS Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "a101-cors-trigger.txt"
+
+permissions:
+  contents: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check public A101 search CORS
+        run: |
+          mkdir -p data
+          {
+            echo "checked_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            curl -sS -D - -o /tmp/a101.json \
+              -H 'Origin: https://hihats0.github.io' \
+              -H 'Accept: application/json' \
+              'https://a101-ecom.wawlabs.com/search?q=fairy&pn=1&rpp=2' || true
+            echo
+            echo "body_prefix="
+            head -c 300 /tmp/a101.json 2>/dev/null || true
+          } > data/a101-cors-check.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/a101-cors-check.txt
+          git commit -m "A101 CORS kontrol sonucunu yaz" || exit 0
+          git push origin HEAD:main
