@@ -3,7 +3,7 @@
 
 Uses the public unauthenticated WAW search service and public sitemap URLs.
 It deliberately avoids the slower listing-page crawl so every run completes
-within a predictable window.
+within a predictable window. Push trigger revision: 2.
 """
 
 from __future__ import annotations
