@@ -50,6 +50,7 @@ h2 { margin: 4px 0; font-size: 1.15rem; }
 .secondary-button { padding: 11px 13px; background: #e2e8f0; color: #0f172a; }
 .icon-button { width: 42px; height: 42px; background: rgba(255,255,255,.12); color: inherit; font-size: 1.25rem; }
 .full-width { width: 100%; margin-top: 16px; }
+.a101-product-link { display: flex; align-items: center; justify-content: center; width: 100%; margin-top: 14px; text-decoration: none; }
 
 .inline-form { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 14px; }
 input, textarea {
