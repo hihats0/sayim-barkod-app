@@ -1,16 +1,15 @@
-const CACHE_NAME = 'sayim-barkod-v3';
+const CACHE_NAME = 'sayim-barkod-v4';
 const CORE_ASSETS = [
   './',
   './index.html',
-  './styles.css?v=3',
-  './app.js?v=3',
-  './lookup-fix.js?v=3',
-  './pwa-install.js?v=3',
-  './manifest.webmanifest?v=3',
+  './styles.css?v=4',
+  './app.js?v=4',
+  './lookup-fix.js?v=4',
+  './pwa-install.js?v=4',
+  './manifest.webmanifest?v=4',
   './icon.svg',
   './icon-192.svg',
-  './icon-512.svg',
-  './data/a101-products.json'
+  './icon-512.svg'
 ];
 
 self.addEventListener('install', (event) => {
@@ -36,11 +35,6 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (url.pathname.endsWith('/data/a101-products.json')) {
-    event.respondWith(networkFirst(event.request));
-    return;
-  }
-
   event.respondWith(
     fetch(event.request)
       .then((response) => {
@@ -51,18 +45,3 @@ self.addEventListener('fetch', (event) => {
       .catch(() => caches.match(event.request).then((cached) => cached || caches.match('./index.html')))
   );
 });
-
-async function networkFirst(request) {
-  try {
-    const response = await fetch(request, { cache: 'no-store' });
-    const cache = await caches.open(CACHE_NAME);
-    cache.put(request, response.clone());
-    return response;
-  } catch (_) {
-    return (await caches.match(request))
-      || new Response(JSON.stringify({
-        metadata: { status: 'offline', message: 'Çevrimdışı katalog verisi bulunamadı.' },
-        products: []
-      }), { headers: { 'Content-Type': 'application/json' } });
-  }
-}
