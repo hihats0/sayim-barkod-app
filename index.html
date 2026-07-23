@@ -4,29 +4,39 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="theme-color" content="#0f172a" />
-  <meta name="description" content="Telefondan barkod okutarak ortak stok sayımı yapın." />
-  <link rel="manifest" href="./manifest.webmanifest" />
+  <meta name="description" content="A101 ürün kataloğu ile telefondan barkod okutarak ortak stok sayımı yapın." />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Sayım Barkod" />
+  <link rel="manifest" href="./manifest.webmanifest?v=3" />
   <link rel="icon" href="./icon.svg" type="image/svg+xml" />
-  <link rel="stylesheet" href="./styles.css?v=2" />
+  <link rel="apple-touch-icon" href="./icon-192.svg" />
+  <link rel="stylesheet" href="./styles.css?v=3" />
   <title>Sayım Barkod</title>
 </head>
 <body>
   <header class="topbar">
     <div>
-      <p class="eyebrow">ORTAK STOK SAYIMI</p>
+      <p class="eyebrow">A101 STOK SAYIMI</p>
       <h1>Sayım Barkod</h1>
     </div>
-    <button id="settingsButton" class="icon-button" aria-label="Ayarlar">⚙</button>
+    <div class="topbar-actions">
+      <button id="installButton" class="install-button hidden" type="button">Uygulamayı yükle</button>
+      <button id="settingsButton" class="icon-button" aria-label="Ayarlar">⚙</button>
+    </div>
   </header>
 
   <main class="container">
     <section class="status-row" aria-live="polite">
       <span id="databaseBadge" class="badge badge-local">Yerel demo</span>
       <span id="sessionBadge" class="badge">Genel Sayım</span>
+      <span id="catalogBadge" class="badge">A101 kataloğu yükleniyor</span>
     </section>
 
-    <nav class="tabs" aria-label="Uygulama bölümleri">
+    <nav class="tabs tabs-three" aria-label="Uygulama bölümleri">
       <button class="tab active" data-tab="scan">Barkod okut</button>
+      <button class="tab" data-tab="catalog">A101 ürünleri</button>
       <button class="tab" data-tab="list">Sayım listesi</button>
     </nav>
 
@@ -46,7 +56,7 @@
         <form id="barcodeForm" class="inline-form">
           <label class="sr-only" for="barcodeInput">Barkod numarası</label>
           <input id="barcodeInput" inputmode="numeric" autocomplete="off" placeholder="869... barkod numarası" maxlength="18" />
-          <button type="submit" class="primary-button">A101’de ara</button>
+          <button type="submit" class="primary-button">A101’de bul</button>
         </form>
       </article>
 
@@ -79,6 +89,23 @@
 
         <button id="saveCountButton" class="primary-button full-width">Sayıma ekle</button>
       </article>
+    </section>
+
+    <section id="catalogView" class="view">
+      <article class="card">
+        <div class="card-heading catalog-heading">
+          <div>
+            <p class="step">A101 KATALOĞU</p>
+            <h2>Tüm ürünler</h2>
+          </div>
+          <button id="reloadCatalogButton" type="button" class="secondary-button">Yenile</button>
+        </div>
+        <p id="catalogStatus" class="muted">Katalog verisi kontrol ediliyor.</p>
+        <input id="catalogSearchInput" type="search" placeholder="Ürün adı, marka veya barkod ara" autocomplete="off" />
+      </article>
+      <div id="catalogList" class="catalog-list"></div>
+      <button id="loadMoreCatalogButton" type="button" class="secondary-button full-width hidden">Daha fazla göster</button>
+      <p id="catalogEmptyState" class="empty-state">Katalog henüz hazırlanmadı.</p>
     </section>
 
     <section id="listView" class="view">
@@ -138,7 +165,8 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./app.js?v=2" defer></script>
-  <script src="./lookup-fix.js?v=2" defer></script>
+  <script src="./app.js?v=3" defer></script>
+  <script src="./lookup-fix.js?v=3" defer></script>
+  <script src="./pwa-install.js?v=3" defer></script>
 </body>
 </html>
