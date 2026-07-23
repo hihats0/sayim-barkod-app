@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0f172a" />
+  <meta name="description" content="Telefondan barkod okutarak ortak stok sayımı yapın." />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="./styles.css" />
+  <title>Sayım Barkod</title>
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">ORTAK STOK SAYIMI</p>
+      <h1>Sayım Barkod</h1>
+    </div>
+    <button id="settingsButton" class="icon-button" aria-label="Ayarlar">⚙</button>
+  </header>
+
+  <main class="container">
+    <section class="status-row" aria-live="polite">
+      <span id="databaseBadge" class="badge badge-local">Yerel demo</span>
+      <span id="sessionBadge" class="badge">Genel Sayım</span>
+    </section>
+
+    <nav class="tabs" aria-label="Uygulama bölümleri">
+      <button class="tab active" data-tab="scan">Barkod okut</button>
+      <button class="tab" data-tab="list">Sayım listesi</button>
+    </nav>
+
+    <section id="scanView" class="view active">
+      <article class="card">
+        <div class="card-heading">
+          <div>
+            <p class="step">1. ADIM</p>
+            <h2>Barkodu okut</h2>
+          </div>
+          <button id="toggleScannerButton" class="secondary-button">Kamerayı aç</button>
+        </div>
+
+        <div id="reader" class="reader hidden"></div>
+        <p id="cameraHelp" class="muted">Kamerayı aç veya barkod numarasını elle gir.</p>
+
+        <form id="barcodeForm" class="inline-form">
+          <label class="sr-only" for="barcodeInput">Barkod numarası</label>
+          <input id="barcodeInput" inputmode="numeric" autocomplete="off" placeholder="869... barkod numarası" maxlength="18" />
+          <button type="submit" class="primary-button">Ara</button>
+        </form>
+      </article>
+
+      <article id="productCard" class="card product-card hidden">
+        <div class="product-summary">
+          <img id="productImage" class="product-image hidden" alt="Ürün görseli" />
+          <div class="product-copy">
+            <p id="productBarcode" class="barcode-text"></p>
+            <h2 id="productName">Ürün</h2>
+            <p id="productBrand" class="muted"></p>
+          </div>
+        </div>
+
+        <div id="manualProductFields" class="manual-fields hidden">
+          <label for="manualProductName">Ürün adı</label>
+          <input id="manualProductName" placeholder="Örn. Zeo Yağlı Siyah Zeytin 500 g" />
+          <label for="manualProductBrand">Marka (isteğe bağlı)</label>
+          <input id="manualProductBrand" placeholder="Örn. Zeo" />
+        </div>
+
+        <div class="quantity-block">
+          <p class="step">2. ADIM</p>
+          <label for="quantityInput">Adet</label>
+          <div class="quantity-control">
+            <button id="decreaseButton" type="button" aria-label="Bir azalt">−</button>
+            <input id="quantityInput" type="number" min="1" step="1" value="1" inputmode="numeric" />
+            <button id="increaseButton" type="button" aria-label="Bir artır">+</button>
+          </div>
+        </div>
+
+        <button id="saveCountButton" class="primary-button full-width">Sayıma ekle</button>
+      </article>
+    </section>
+
+    <section id="listView" class="view">
+      <article class="card summary-card">
+        <div>
+          <p class="step">AKTİF SAYIM</p>
+          <h2 id="summarySession">Genel Sayım</h2>
+        </div>
+        <div class="summary-numbers">
+          <div><strong id="uniqueProductCount">0</strong><span>ürün</span></div>
+          <div><strong id="totalQuantity">0</strong><span>adet</span></div>
+        </div>
+      </article>
+
+      <div class="list-toolbar">
+        <input id="listSearchInput" type="search" placeholder="Ürün veya barkod ara" />
+        <button id="refreshButton" class="secondary-button">Yenile</button>
+      </div>
+
+      <div id="countList" class="count-list"></div>
+      <p id="emptyState" class="empty-state">Bu sayımda henüz ürün yok.</p>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <dialog id="settingsDialog" class="settings-dialog">
+    <form method="dialog" class="dialog-card" id="settingsForm">
+      <div class="dialog-heading">
+        <div>
+          <p class="step">AYARLAR</p>
+          <h2>Ortak veritabanı</h2>
+        </div>
+        <button class="icon-button" value="cancel" aria-label="Kapat">×</button>
+      </div>
+
+      <label for="staffNameInput">Sayım yapan kişi</label>
+      <input id="staffNameInput" placeholder="Örn. Yiğit" />
+
+      <label for="sessionNameInput">Sayım adı</label>
+      <input id="sessionNameInput" placeholder="Örn. Temmuz 2026 A101 Sayımı" />
+
+      <label for="supabaseUrlInput">Supabase proje URL'si</label>
+      <input id="supabaseUrlInput" type="url" placeholder="https://xxxx.supabase.co" />
+
+      <label for="supabaseKeyInput">Supabase publishable / anon key</label>
+      <textarea id="supabaseKeyInput" rows="3" placeholder="sb_publishable_... veya eyJ..."></textarea>
+
+      <p class="warning">Secret veya service_role anahtarını buraya koyma. Bu MVP, SQL dosyasındaki herkese açık politikaları kullanır.</p>
+
+      <div class="dialog-actions">
+        <button id="useLocalButton" type="button" class="secondary-button">Yerel demo kullan</button>
+        <button id="saveSettingsButton" type="button" class="primary-button">Kaydet ve bağlan</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="./app.js" defer></script>
+</body>
+</html>
