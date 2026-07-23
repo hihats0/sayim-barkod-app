@@ -4,6 +4,11 @@ on:
   workflow_dispatch:
   schedule:
     - cron: "7,22,37,52 * * * *"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/process_a101_lookup_queue.py"
+      - ".github/workflows/process-a101-lookup-queue.yml"
 
 permissions:
   contents: read
