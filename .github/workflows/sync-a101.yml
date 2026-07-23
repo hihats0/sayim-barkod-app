@@ -107,7 +107,7 @@ jobs:
         if: always()
         run: |
           rm -f data/a101-sync.log
-          if git diff --quiet -- data/a101-products.json data/a101-sync-status.json; then
+          if [ -z "$(git status --porcelain -- data/a101-products.json data/a101-sync-status.json)" ]; then
             echo "Catalog and diagnostics unchanged."
             exit 0
           fi
