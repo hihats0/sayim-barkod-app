@@ -1,9 +1,30 @@
 {
-  "checkedAt": "2026-07-23T20:10:32.321297+00:00",
-  "expectedBarcode": "8006540335925",
-  "accessControlAllowOrigin": "*",
-  "scannedPages": 3,
-  "candidateObjects": 5742,
-  "exactMatchCount": 0,
-  "exactMatches": []
+  "checkedAt": "2026-07-23T20:13:13.467623+00:00",
+  "barcode": "8006540335925",
+  "sources": {
+    "openproductsfacts": {
+      "error": "HTTPError: HTTP Error 404: Not Found"
+    },
+    "openfoodfacts": {
+      "error": "HTTPError: HTTP Error 404: Not Found"
+    },
+    "upcitemdb": {
+      "status": 200,
+      "allowOrigin": "https://www.upcitemdb.com",
+      "contentType": "application/json; charset=utf-8",
+      "containsBarcode": false,
+      "containsFairy": false,
+      "containsA101ProductUrl": false,
+      "prefix": "{\"code\":\"OK\",\"total\":0,\"offset\":0,\"items\":[]}"
+    },
+    "a101_jina_name_search": {
+      "status": 200,
+      "allowOrigin": "https://hihats0.github.io",
+      "contentType": "text/plain; charset=utf-8",
+      "containsBarcode": false,
+      "containsFairy": true,
+      "containsA101ProductUrl": true,
+      "prefix": "Title: Just a moment...\n\nURL Source: http://www.a101.com.tr/kapida/search?query=Fairy%20S%C4%B1v%C4%B1%20Bula%C5%9F%C4%B1k%20Deterjan%C4%B1%202600%20ml\n\nWarning: This page maybe requiring CAPTCHA, please make sure you are authorized to access this page.\n\nMarkdown Content:\n![Image 1: Icon for www.a101.com.tr](http://www.a101.com.tr/favicon.ico)\n\n## www.a101.com.tr\n\n## Performing security verification\n\nThis website uses a security service to protect against malicious bots. This page is displayed while the website verifies you are not a bot.\n"
+    }
+  }
 }
