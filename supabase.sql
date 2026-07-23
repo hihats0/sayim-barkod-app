@@ -22,14 +22,31 @@ create table if not exists public.count_entries (
   created_at timestamptz not null default now()
 );
 
+-- A101'de ilk denemede bulunmayan barkodlar burada bekler.
+-- Uygulamayı kullanan herhangi bir çevrim içi telefon bu kuyruğu işler,
+-- bulunan ürünü products tablosuna yazar ve kuyruk kaydını siler.
+create table if not exists public.product_lookup_queue (
+  barcode text primary key,
+  name_hint text not null default '',
+  brand_hint text not null default '',
+  status text not null default 'pending' check (status in ('pending', 'processing', 'failed')),
+  attempts integer not null default 0 check (attempts >= 0),
+  next_attempt_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create index if not exists count_entries_session_idx
   on public.count_entries (session_name, created_at desc);
 
 create index if not exists count_entries_barcode_idx
   on public.count_entries (barcode);
 
+create index if not exists product_lookup_queue_pending_idx
+  on public.product_lookup_queue (status, next_attempt_at, updated_at);
+
 alter table public.products enable row level security;
 alter table public.count_entries enable row level security;
+alter table public.product_lookup_queue enable row level security;
 
 drop policy if exists "Public products read" on public.products;
 drop policy if exists "Public products insert" on public.products;
@@ -39,6 +56,10 @@ drop policy if exists "Public counts read" on public.count_entries;
 drop policy if exists "Public counts insert" on public.count_entries;
 drop policy if exists "Public counts update" on public.count_entries;
 drop policy if exists "Public counts delete" on public.count_entries;
+drop policy if exists "Public lookup queue read" on public.product_lookup_queue;
+drop policy if exists "Public lookup queue insert" on public.product_lookup_queue;
+drop policy if exists "Public lookup queue update" on public.product_lookup_queue;
+drop policy if exists "Public lookup queue delete" on public.product_lookup_queue;
 
 create policy "Public products read" on public.products for select to anon using (true);
 create policy "Public products insert" on public.products for insert to anon with check (true);
@@ -50,9 +71,15 @@ create policy "Public counts insert" on public.count_entries for insert to anon 
 create policy "Public counts update" on public.count_entries for update to anon using (true) with check (true);
 create policy "Public counts delete" on public.count_entries for delete to anon using (true);
 
+create policy "Public lookup queue read" on public.product_lookup_queue for select to anon using (true);
+create policy "Public lookup queue insert" on public.product_lookup_queue for insert to anon with check (true);
+create policy "Public lookup queue update" on public.product_lookup_queue for update to anon using (true) with check (true);
+create policy "Public lookup queue delete" on public.product_lookup_queue for delete to anon using (true);
+
 grant usage on schema public to anon;
 grant select, insert, update, delete on public.products to anon;
 grant select, insert, update, delete on public.count_entries to anon;
+grant select, insert, update, delete on public.product_lookup_queue to anon;
 grant usage, select on all sequences in schema public to anon;
 
 -- Realtime güncellemeleri için tabloyu yayına ekler.
