@@ -18,20 +18,74 @@ jobs:
           fetch-depth: 0
       - name: Check public A101 exact barcode lookup
         run: |
-          mkdir -p data
-          {
-            echo "checked_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            curl -sS -D /tmp/a101.headers -o /tmp/a101.json \
+          mkdir -p data /tmp/a101-pages
+          for page in 1 2 3; do
+            curl -sS -D "/tmp/a101-pages/headers-$page.txt" \
+              -o "/tmp/a101-pages/page-$page.json" \
               -H 'Origin: https://hihats0.github.io' \
               -H 'Accept: application/json' \
-              'https://a101-ecom.wawlabs.com/search?q=8006540335925&pn=1&rpp=60' || true
-            cat /tmp/a101.headers
-            echo
-            echo "body="
-            cat /tmp/a101.json 2>/dev/null || true
-          } > data/a101-cors-check.txt
+              "https://a101-ecom.wawlabs.com/search?q=8006540335925&pn=$page&rpp=60" || true
+          done
+          python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          expected = '8006540335925'
+          matches = []
+          product_objects = 0
+
+          def walk(value):
+              if isinstance(value, dict):
+                  yield value
+                  for child in value.values():
+                      yield from walk(child)
+              elif isinstance(value, list):
+                  for child in value:
+                      yield from walk(child)
+
+          for path in sorted(Path('/tmp/a101-pages').glob('page-*.json')):
+              try:
+                  payload = json.loads(path.read_text(encoding='utf-8'))
+              except Exception:
+                  continue
+              for obj in walk(payload):
+                  attrs = obj.get('attributes') if isinstance(obj.get('attributes'), dict) else {}
+                  name = obj.get('title') or obj.get('name') or attrs.get('name')
+                  barcode = str(obj.get('barcode') or attrs.get('barcode') or attrs.get('Barkod') or '')
+                  if name and (obj.get('id') or barcode):
+                      product_objects += 1
+                  if barcode.lstrip('0') == expected.lstrip('0'):
+                      matches.append({
+                          'name': name,
+                          'barcode': barcode,
+                          'id': obj.get('id') or obj.get('baseId'),
+                          'url': obj.get('seoUrl') or obj.get('url') or attrs.get('url'),
+                      })
+
+          headers = Path('/tmp/a101-pages/headers-1.txt').read_text(encoding='utf-8', errors='replace')
+          allow_origin = ''
+          for line in headers.splitlines():
+              if line.lower().startswith('access-control-allow-origin:'):
+                  allow_origin = line.split(':', 1)[1].strip()
+
+          result = {
+              'checkedAt': datetime.now(timezone.utc).isoformat(),
+              'expectedBarcode': expected,
+              'accessControlAllowOrigin': allow_origin,
+              'scannedPages': 3,
+              'candidateObjects': product_objects,
+              'exactMatchCount': len(matches),
+              'exactMatches': matches[:10],
+          }
+          Path('data/a101-cors-check.txt').write_text(
+              json.dumps(result, ensure_ascii=False, indent=2),
+              encoding='utf-8',
+          )
+          print(json.dumps(result, ensure_ascii=False, indent=2))
+          PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/a101-cors-check.txt
-          git commit -m "A101 tam barkod kontrol sonucunu yaz" || exit 0
+          git commit -m "A101 tam barkod eşleşme sonucunu yaz" || exit 0
           git push origin HEAD:main
