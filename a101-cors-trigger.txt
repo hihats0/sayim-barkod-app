@@ -1,3 +1,2 @@
-trigger: 2026-07-23T23:45:00+03:00
-barcode: 8006540335925
-check: shelf-product-sources
+trigger: 2026-07-23T23:58:00+03:00
+check: parse-api-cors
