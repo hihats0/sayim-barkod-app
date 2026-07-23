@@ -22,7 +22,7 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 8
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,14 +44,14 @@ jobs:
       - name: Build A101 catalog
         id: build
         continue-on-error: true
-        timeout-minutes: 7
+        timeout-minutes: 4
         env:
           PARSE_API_KEY: ${{ secrets.PARSE_API_KEY }}
-          A101_REQUEST_DELAY: "0.50"
-          A101_HTTP_TIMEOUT: "12"
-          A101_WAW_DELAY: "0.30"
-          A101_WAW_MAX_PAGES: "12"
-          A101_WAW_QUERIES: "a,e,i,ı,o,ö,u,ü"
+          A101_REQUEST_DELAY: "0.45"
+          A101_HTTP_TIMEOUT: "8"
+          A101_WAW_DELAY: "0.20"
+          A101_WAW_MAX_PAGES: "5"
+          A101_WAW_QUERIES: "a,e,i,o"
         run: |
           set -o pipefail
           python scripts/sync_a101_catalog_quick.py 2>&1 | tee data/a101-sync.log
