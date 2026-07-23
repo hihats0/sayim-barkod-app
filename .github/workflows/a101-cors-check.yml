@@ -16,21 +16,22 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Check public A101 search CORS
+      - name: Check public A101 exact barcode lookup
         run: |
           mkdir -p data
           {
             echo "checked_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-            curl -sS -D - -o /tmp/a101.json \
+            curl -sS -D /tmp/a101.headers -o /tmp/a101.json \
               -H 'Origin: https://hihats0.github.io' \
               -H 'Accept: application/json' \
-              'https://a101-ecom.wawlabs.com/search?q=fairy&pn=1&rpp=2' || true
+              'https://a101-ecom.wawlabs.com/search?q=8006540335925&pn=1&rpp=60' || true
+            cat /tmp/a101.headers
             echo
-            echo "body_prefix="
-            head -c 300 /tmp/a101.json 2>/dev/null || true
+            echo "body="
+            cat /tmp/a101.json 2>/dev/null || true
           } > data/a101-cors-check.txt
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/a101-cors-check.txt
-          git commit -m "A101 CORS kontrol sonucunu yaz" || exit 0
+          git commit -m "A101 tam barkod kontrol sonucunu yaz" || exit 0
           git push origin HEAD:main
