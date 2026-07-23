@@ -9,10 +9,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Sayım Barkod" />
-  <link rel="manifest" href="./manifest.webmanifest?v=4" />
+  <link rel="manifest" href="./manifest.webmanifest?v=5" />
   <link rel="icon" href="./icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="./icon-192.svg" />
-  <link rel="stylesheet" href="./styles.css?v=4" />
+  <link rel="stylesheet" href="./styles.css?v=5" />
   <title>Sayım Barkod</title>
 </head>
 <body>
@@ -51,7 +51,7 @@
         </div>
 
         <div id="reader" class="reader hidden"></div>
-        <p id="cameraHelp" class="muted">Kamerayı aç veya barkod numarasını elle gir. Bilinmeyen barkod internette canlı aranır.</p>
+        <p id="cameraHelp" class="muted">Kamerayı aç veya barkod numarasını elle gir. Bilinmeyen barkod internette aranır; ilk sefer ürün adını yazman gerekebilir.</p>
 
         <form id="barcodeForm" class="inline-form">
           <label class="sr-only" for="barcodeInput">Barkod numarası</label>
@@ -75,7 +75,7 @@
           <input id="manualProductName" placeholder="Örn. Fairy Sıvı Bulaşık Deterjanı 1 L" />
           <label for="manualProductBrand">Marka (isteğe bağlı)</label>
           <input id="manualProductBrand" placeholder="Örn. Fairy" />
-          <p class="muted">Elle kaydedilen ürünün barkodu kuyruğa alınır; uygulama açıkken veya yeniden açıldığında A101’de tekrar aranır.</p>
+          <p class="muted">İlk kez adı girilen ürün A101 Kapıda rafında aranır, bulunan sonuç bu barkoda bağlanır ve sonraki telefonlarda tekrar aranmaz.</p>
         </div>
 
         <div class="quantity-block">
@@ -101,7 +101,7 @@
           </div>
           <button id="reloadCatalogButton" type="button" class="secondary-button">Eksikleri tekrar ara</button>
         </div>
-        <p id="catalogStatus" class="muted">Toplu spot listesi yüklenmez. Her yeni barkod canlı aranır ve bulunan ürün bir daha aranmak üzere ortak hafızaya kaydedilir.</p>
+        <p id="catalogStatus" class="muted">Toplu spot listesi yüklenmez. Her yeni ürün kullanıldıkça A101 raf aramasına çıkar ve ortak hafızaya eklenir.</p>
         <input id="catalogSearchInput" type="search" placeholder="Öğrenilmiş ürün adı, marka veya barkod ara" autocomplete="off" />
       </article>
       <div id="catalogList" class="catalog-list"></div>
@@ -166,8 +166,8 @@
 
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./app.js?v=4" defer></script>
-  <script src="./lookup-fix.js?v=4" defer></script>
-  <script src="./pwa-install.js?v=4" defer></script>
+  <script src="./app.js?v=5" defer></script>
+  <script src="./lookup-fix.js?v=5" defer></script>
+  <script src="./pwa-install.js?v=5" defer></script>
 </body>
 </html>
