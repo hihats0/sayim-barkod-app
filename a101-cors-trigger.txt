@@ -1,2 +1,0 @@
-trigger: 2026-07-23T23:58:00+03:00
-check: parse-api-cors
