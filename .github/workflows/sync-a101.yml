@@ -21,7 +21,7 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,8 +46,9 @@ jobs:
           A101_REQUEST_DELAY: "0.55"
           A101_MAX_PRODUCTS: "15000"
           A101_MAX_LISTING_PAGES: "180"
-          A101_WAW_DELAY: "0.40"
-          A101_WAW_MAX_PAGES: "60"
+          A101_WAW_DELAY: "0.35"
+          A101_WAW_MAX_PAGES: "12"
+          A101_WAW_QUERIES: "a,e,i,ı,o,ö,u,ü"
         run: python scripts/sync_a101_catalog_fast.py
 
       - name: Validate generated JSON
