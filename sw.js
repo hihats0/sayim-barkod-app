@@ -1,5 +1,13 @@
-const CACHE_NAME = 'sayim-barkod-v1';
-const CORE_ASSETS = ['./', './index.html', './styles.css', './app.js', './manifest.webmanifest', './icon.svg'];
+const CACHE_NAME = 'sayim-barkod-v2';
+const CORE_ASSETS = [
+  './',
+  './index.html',
+  './styles.css?v=2',
+  './app.js?v=2',
+  './lookup-fix.js?v=2',
+  './manifest.webmanifest',
+  './icon.svg'
+];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(CORE_ASSETS)));
