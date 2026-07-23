@@ -16,76 +16,59 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Check public A101 exact barcode lookup
+      - name: Check on-demand shelf product sources
         run: |
-          mkdir -p data /tmp/a101-pages
-          for page in 1 2 3; do
-            curl -sS -D "/tmp/a101-pages/headers-$page.txt" \
-              -o "/tmp/a101-pages/page-$page.json" \
-              -H 'Origin: https://hihats0.github.io' \
-              -H 'Accept: application/json' \
-              "https://a101-ecom.wawlabs.com/search?q=8006540335925&pn=$page&rpp=60" || true
-          done
+          mkdir -p data
           python - <<'PY'
           import json
+          import urllib.parse
+          import urllib.request
           from datetime import datetime, timezone
-          from pathlib import Path
 
-          expected = '8006540335925'
-          matches = []
-          product_objects = 0
-
-          def walk(value):
-              if isinstance(value, dict):
-                  yield value
-                  for child in value.values():
-                      yield from walk(child)
-              elif isinstance(value, list):
-                  for child in value:
-                      yield from walk(child)
-
-          for path in sorted(Path('/tmp/a101-pages').glob('page-*.json')):
-              try:
-                  payload = json.loads(path.read_text(encoding='utf-8'))
-              except Exception:
-                  continue
-              for obj in walk(payload):
-                  attrs = obj.get('attributes') if isinstance(obj.get('attributes'), dict) else {}
-                  name = obj.get('title') or obj.get('name') or attrs.get('name')
-                  barcode = str(obj.get('barcode') or attrs.get('barcode') or attrs.get('Barkod') or '')
-                  if name and (obj.get('id') or barcode):
-                      product_objects += 1
-                  if barcode.lstrip('0') == expected.lstrip('0'):
-                      matches.append({
-                          'name': name,
-                          'barcode': barcode,
-                          'id': obj.get('id') or obj.get('baseId'),
-                          'url': obj.get('seoUrl') or obj.get('url') or attrs.get('url'),
-                      })
-
-          headers = Path('/tmp/a101-pages/headers-1.txt').read_text(encoding='utf-8', errors='replace')
-          allow_origin = ''
-          for line in headers.splitlines():
-              if line.lower().startswith('access-control-allow-origin:'):
-                  allow_origin = line.split(':', 1)[1].strip()
+          barcode = '8006540335925'
+          urls = {
+              'openproductsfacts': f'https://world.openproductsfacts.org/api/v2/product/{barcode}.json',
+              'openfoodfacts': f'https://world.openfoodfacts.org/api/v2/product/{barcode}.json',
+              'upcitemdb': f'https://api.upcitemdb.com/prod/trial/lookup?upc={barcode}',
+              'a101_jina_name_search': 'https://r.jina.ai/http://www.a101.com.tr/kapida/search?query=' + urllib.parse.quote('Fairy Sıvı Bulaşık Deterjanı 2600 ml'),
+          }
 
           result = {
               'checkedAt': datetime.now(timezone.utc).isoformat(),
-              'expectedBarcode': expected,
-              'accessControlAllowOrigin': allow_origin,
-              'scannedPages': 3,
-              'candidateObjects': product_objects,
-              'exactMatchCount': len(matches),
-              'exactMatches': matches[:10],
+              'barcode': barcode,
+              'sources': {},
           }
-          Path('data/a101-cors-check.txt').write_text(
-              json.dumps(result, ensure_ascii=False, indent=2),
-              encoding='utf-8',
-          )
+
+          for name, url in urls.items():
+              request = urllib.request.Request(
+                  url,
+                  headers={
+                      'User-Agent': 'SayimBarkod/1.0 (+https://github.com/hihats0/sayim-barkod-app)',
+                      'Origin': 'https://hihats0.github.io',
+                      'Accept': 'application/json,text/plain,*/*',
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=25) as response:
+                      body = response.read(200000).decode('utf-8', errors='replace')
+                      result['sources'][name] = {
+                          'status': response.status,
+                          'allowOrigin': response.headers.get('access-control-allow-origin', ''),
+                          'contentType': response.headers.get('content-type', ''),
+                          'containsBarcode': barcode in body,
+                          'containsFairy': 'fairy' in body.lower(),
+                          'containsA101ProductUrl': 'a101.com.tr/kapida/' in body,
+                          'prefix': body[:1200],
+                      }
+              except Exception as exc:
+                  result['sources'][name] = {'error': f'{type(exc).__name__}: {exc}'}
+
+          with open('data/a101-cors-check.txt', 'w', encoding='utf-8') as handle:
+              json.dump(result, handle, ensure_ascii=False, indent=2)
           print(json.dumps(result, ensure_ascii=False, indent=2))
           PY
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add data/a101-cors-check.txt
-          git commit -m "A101 tam barkod eşleşme sonucunu yaz" || exit 0
+          git commit -m "Raf ürünü kaynak test sonucunu yaz" || exit 0
           git push origin HEAD:main
