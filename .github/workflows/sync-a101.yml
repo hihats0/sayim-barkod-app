@@ -1,0 +1,69 @@
+name: Sync A101 Catalog
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "25 2 * * *"
+  push:
+    branches: [main]
+    paths:
+      - "scripts/sync_a101_catalog.py"
+      - ".github/workflows/sync-a101.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: a101-catalog-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install scraper dependencies
+        run: pip install requests beautifulsoup4
+
+      - name: Build A101 catalog
+        env:
+          PARSE_API_KEY: ${{ secrets.PARSE_API_KEY }}
+          A101_REQUEST_DELAY: "0.65"
+          A101_MAX_PRODUCTS: "12000"
+          A101_MAX_LISTING_PAGES: "750"
+        run: python scripts/sync_a101_catalog.py
+
+      - name: Validate generated JSON
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          path = Path("data/a101-products.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          assert isinstance(data.get("products"), list)
+          print(json.dumps(data.get("metadata", {}), ensure_ascii=False, indent=2))
+          PY
+
+      - name: Commit refreshed catalog
+        run: |
+          if git diff --quiet -- data/a101-products.json; then
+            echo "Catalog unchanged."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/a101-products.json
+          git commit -m "A101 kataloğunu güncelle"
+          git pull --rebase origin main
+          git push origin HEAD:main
