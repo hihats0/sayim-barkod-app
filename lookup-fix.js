@@ -1,10 +1,7 @@
 const A101_SEARCH_BASE = 'https://www.a101.com.tr/arama?k=';
-const A101_LIVE_ENDPOINTS = [
-  'https://a101-ecom.wawlabs.com/search',
-  'https://a101.wawlabs.com/search'
-];
-const OPEN_FOOD_FACTS_ENDPOINT = 'https://world.openfoodfacts.org/api/v2/product/';
-const LOCAL_LOOKUP_QUEUE_KEY = 'sayim-barkod-lookup-queue-v2';
+const PARSE_A101_API_BASE = 'https://api.parse.bot/scraper/01e0d684-e029-4758-9eb5-c6214e407387';
+const RAF_API_SETTINGS_KEY = 'sayim-barkod-raf-api-settings-v1';
+const LOCAL_LOOKUP_QUEUE_KEY = 'sayim-barkod-lookup-queue-v3';
 const LEARNED_PAGE_SIZE = 60;
 
 const catalogState = {
@@ -17,16 +14,66 @@ const catalogState = {
 const originalShowProduct = window.showProduct;
 
 document.addEventListener('DOMContentLoaded', () => {
+  injectRafApiSettings();
   bindLearnedCatalogUi();
+  bindManualA101Search();
   bindManualEnrichment();
   loadLearnedProducts();
+
   setTimeout(() => {
     loadLearnedProducts();
     processLookupQueue();
   }, 1200);
+
+  window.setInterval(() => processLookupQueue(), 75_000);
 });
 
 window.addEventListener('online', () => processLookupQueue());
+
+function injectRafApiSettings() {
+  const warning = document.querySelector('#settingsForm .warning');
+  if (!warning || document.getElementById('parseApiKeyInput')) return;
+
+  const settings = loadRafApiSettings();
+  const wrapper = document.createElement('div');
+  wrapper.className = 'raf-api-settings';
+  wrapper.innerHTML = `
+    <label for="parseApiKeyInput">A101 raf ürünleri API anahtarı</label>
+    <input id="parseApiKeyInput" type="password" autocomplete="off" placeholder="Parse API key" value="${escapeAttribute(settings.parseApiKey)}" />
+    <p class="muted">Bilinmeyen barkodun ürün adı girildiğinde A101 Kapıda raf kataloğunu arar. Ücretsiz planda ayda 100 yeni ürün sorgusu vardır.</p>
+    <a class="secondary-button a101-product-link" href="https://parse.bot/marketplace/66397d30-5b86-4b47-a4d4-ddf2a0ac79ef/a101-com-tr-api" target="_blank" rel="noopener noreferrer">Ücretsiz API anahtarı al</a>
+    <label for="a101StoreIdInput">A101 mağaza kodu (isteğe bağlı)</label>
+    <input id="a101StoreIdInput" autocomplete="off" placeholder="Örn. VS032" value="${escapeAttribute(settings.storeId)}" />
+  `;
+  warning.insertAdjacentElement('beforebegin', wrapper);
+
+  document.getElementById('saveSettingsButton')?.addEventListener('click', () => {
+    saveRafApiSettings({
+      parseApiKey: cleanText(document.getElementById('parseApiKeyInput')?.value),
+      storeId: cleanText(document.getElementById('a101StoreIdInput')?.value)
+    });
+    setTimeout(() => processLookupQueue(), 400);
+  }, true);
+}
+
+function loadRafApiSettings() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RAF_API_SETTINGS_KEY));
+    return {
+      parseApiKey: cleanText(parsed?.parseApiKey),
+      storeId: cleanText(parsed?.storeId)
+    };
+  } catch (_) {
+    return { parseApiKey: '', storeId: '' };
+  }
+}
+
+function saveRafApiSettings(settings) {
+  localStorage.setItem(RAF_API_SETTINGS_KEY, JSON.stringify({
+    parseApiKey: cleanText(settings.parseApiKey),
+    storeId: cleanText(settings.storeId)
+  }));
+}
 
 function bindLearnedCatalogUi() {
   const catalogView = document.getElementById('catalogView');
@@ -54,7 +101,7 @@ function bindLearnedCatalogUi() {
 
   reloadButton.addEventListener('click', async () => {
     reloadButton.disabled = true;
-    reloadButton.textContent = 'Aranıyor…';
+    reloadButton.textContent = 'Eksik aranıyor…';
     try {
       await processLookupQueue(true);
       await loadLearnedProducts();
@@ -70,15 +117,72 @@ function bindLearnedCatalogUi() {
   });
 }
 
+function bindManualA101Search() {
+  const manualFields = document.getElementById('manualProductFields');
+  if (!manualFields || document.getElementById('manualA101SearchButton')) return;
+
+  const button = document.createElement('button');
+  button.id = 'manualA101SearchButton';
+  button.type = 'button';
+  button.className = 'secondary-button full-width';
+  button.textContent = 'Yazdığım adla A101 rafında bul';
+  button.addEventListener('click', searchManualProductOnA101);
+  manualFields.appendChild(button);
+}
+
+async function searchManualProductOnA101() {
+  const button = document.getElementById('manualA101SearchButton');
+  const barcode = normalizeBarcodeKey(state.currentProduct?.barcode || document.getElementById('barcodeInput')?.value);
+  const name = cleanText(document.getElementById('manualProductName')?.value);
+  const brand = cleanText(document.getElementById('manualProductBrand')?.value);
+
+  if (!barcode || !name) {
+    showToast('Önce barkodu ve ürün adını yaz.', true);
+    return;
+  }
+
+  const settings = loadRafApiSettings();
+  if (!settings.parseApiKey) {
+    await queueProductLookup({ barcode, name, brand });
+    showToast('Ayarlar bölümünden ücretsiz A101 raf API anahtarını ekle.', true);
+    return;
+  }
+
+  button.disabled = true;
+  button.textContent = 'A101 rafında aranıyor…';
+  try {
+    const match = await searchA101Kapida(name, brand);
+    if (!match) {
+      await queueProductLookup({ barcode, name, brand });
+      showToast('A101 rafında güvenilir eşleşme bulunamadı; tekrar arama kuyruğuna alındı.', true);
+      return;
+    }
+
+    const product = mapKapidaProductToCounter(match, barcode);
+    state.currentProduct = product;
+    await persistProduct(product);
+    await completeQueuedLookup(barcode);
+    showProduct(product, false);
+    await loadLearnedProducts();
+    showToast('A101 raf ürünü bulundu ve barkoda bağlandı.');
+  } catch (error) {
+    await queueProductLookup({ barcode, name, brand });
+    showToast(`A101 raf araması başarısız: ${friendlyCatalogError(error)}`, true);
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Yazdığım adla A101 rafında bul';
+  }
+}
+
 function bindManualEnrichment() {
   const saveButton = document.getElementById('saveCountButton');
   saveButton.addEventListener('click', () => {
     const manualFields = document.getElementById('manualProductFields');
     if (manualFields.classList.contains('hidden')) return;
 
-    const barcode = normalizeBarcodeKey(document.getElementById('barcodeInput').value);
-    const name = cleanText(document.getElementById('manualProductName').value);
-    const brand = cleanText(document.getElementById('manualProductBrand').value);
+    const barcode = normalizeBarcodeKey(state.currentProduct?.barcode || document.getElementById('barcodeInput')?.value);
+    const name = cleanText(document.getElementById('manualProductName')?.value);
+    const brand = cleanText(document.getElementById('manualProductBrand')?.value);
     if (!barcode || !name) return;
 
     queueProductLookup({ barcode, name, brand });
@@ -95,103 +199,91 @@ window.fetchProductFromInternet = async function fetchProductOnDemand(barcode) {
     return null;
   }
 
-  const exactA101 = await findA101Product(normalizedBarcode, normalizedBarcode);
-  if (exactA101) {
-    await completeQueuedLookup(normalizedBarcode);
-    return mapLiveA101Product(exactA101, normalizedBarcode);
+  const universalProduct = await fetchUniversalProduct(normalizedBarcode);
+  if (!universalProduct) {
+    await queueProductLookup({ barcode: normalizedBarcode });
+    return null;
   }
 
-  const openFoodProduct = await fetchOpenFoodFacts(normalizedBarcode);
-  if (openFoodProduct) {
-    const byName = await findA101Product(openFoodProduct.name, normalizedBarcode);
-    if (byName) {
-      await completeQueuedLookup(normalizedBarcode);
-      return mapLiveA101Product(byName, normalizedBarcode);
-    }
-
-    await queueProductLookup({
-      barcode: normalizedBarcode,
-      name: openFoodProduct.name,
-      brand: openFoodProduct.brand
-    });
-
-    return {
-      ...openFoodProduct,
-      a101Url: `${A101_SEARCH_BASE}${encodeURIComponent(openFoodProduct.name)}`
-    };
-  }
-
-  await queueProductLookup({ barcode: normalizedBarcode });
-  return null;
-};
-
-async function findA101Product(query, expectedBarcode) {
-  const products = await searchA101Live(query, 3);
-  if (!products.length) return null;
-
-  const exact = products.find((product) => barcodesEqual(product.barcode, expectedBarcode));
-  if (exact) return exact;
-
-  return null;
-}
-
-async function searchA101Live(query, maxPages = 2) {
-  const cleanedQuery = cleanText(query);
-  if (!cleanedQuery) return [];
-
-  for (const endpoint of A101_LIVE_ENDPOINTS) {
-    const collected = [];
-    const seen = new Set();
-
+  const settings = loadRafApiSettings();
+  if (settings.parseApiKey) {
     try {
-      for (let page = 1; page <= maxPages; page += 1) {
-        const url = new URL(endpoint);
-        url.searchParams.set('q', cleanedQuery);
-        url.searchParams.set('pn', String(page));
-        url.searchParams.set('rpp', '60');
-
-        const response = await fetchWithTimeout(url.toString(), 9000, {
-          headers: { Accept: 'application/json' },
-          cache: 'no-store'
-        });
-        if (!response.ok) throw new Error(`A101 HTTP ${response.status}`);
-
-        const payload = await response.json();
-        const pageProducts = extractA101Products(payload);
-        let added = 0;
-
-        pageProducts.forEach((product) => {
-          const key = product.barcode || product.sku || product.url || product.name;
-          if (!key || seen.has(key)) return;
-          seen.add(key);
-          collected.push(product);
-          added += 1;
-        });
-
-        if (!pageProducts.length || added === 0 || pageProducts.length < 60) break;
+      const a101Match = await searchA101Kapida(universalProduct.name, universalProduct.brand);
+      if (a101Match) {
+        await completeQueuedLookup(normalizedBarcode);
+        return mapKapidaProductToCounter(a101Match, normalizedBarcode);
       }
-
-      if (collected.length) return collected;
     } catch (_) {
-      // Try the next public A101 endpoint. Network/CORS failures are queued for retry.
+      // General product data is still useful; A101 matching can be retried from the queue.
     }
   }
 
-  return [];
-}
-
-function extractA101Products(payload) {
-  const products = [];
-  const seenObjects = new Set();
-
-  walkJson(payload, (raw) => {
-    if (seenObjects.has(raw) || !looksLikeA101Product(raw)) return;
-    seenObjects.add(raw);
-    const product = normalizeA101Product(raw);
-    if (product?.name && (product.barcode || product.sku)) products.push(product);
+  await queueProductLookup({
+    barcode: normalizedBarcode,
+    name: universalProduct.name,
+    brand: universalProduct.brand
   });
 
-  return products;
+  return {
+    ...universalProduct,
+    a101Url: `${A101_SEARCH_BASE}${encodeURIComponent(universalProduct.name)}`
+  };
+};
+
+async function searchA101Kapida(query, brandHint = '') {
+  const settings = loadRafApiSettings();
+  if (!settings.parseApiKey) throw new Error('A101 raf API anahtarı eksik');
+
+  const url = new URL(`${PARSE_A101_API_BASE}/search_kapida_products`);
+  url.searchParams.set('page', '1');
+  url.searchParams.set('limit', '60');
+  url.searchParams.set('query', cleanText(query));
+  if (settings.storeId) url.searchParams.set('store_id', settings.storeId);
+
+  const response = await fetchWithTimeout(url.toString(), 25_000, {
+    headers: {
+      Accept: 'application/json',
+      'X-API-Key': settings.parseApiKey
+    },
+    cache: 'no-store'
+  });
+
+  if (response.status === 401 || response.status === 403) {
+    throw new Error('API anahtarı geçersiz veya yetkisiz');
+  }
+  if (response.status === 429) throw new Error('Ücretsiz API sorgu limiti doldu');
+  if (!response.ok) throw new Error(`Raf API HTTP ${response.status}`);
+
+  const payload = await response.json();
+  const products = extractKapidaProducts(payload).map(normalizeKapidaProduct).filter((item) => item.name);
+  return chooseBestKapidaMatch(products, query, brandHint);
+}
+
+function extractKapidaProducts(payload) {
+  const data = payload?.data ?? payload;
+  const candidates = [
+    data?.products,
+    payload?.products,
+    data?.page_content,
+    data?.pageContent,
+    data?.res?.[0]?.page_content,
+    data?.res?.[0]?.pageContent,
+    payload?.res?.[0]?.page_content,
+    payload?.res?.[0]?.pageContent
+  ];
+
+  const direct = candidates.find(Array.isArray);
+  if (direct) return direct;
+
+  const collected = [];
+  walkJson(data, (object) => {
+    const name = object?.title || object?.name || object?.product_name;
+    const id = object?.id || object?.sku || object?.productId;
+    if (name && id && (object?.price != null || object?.image || object?.images || object?.link)) {
+      collected.push(object);
+    }
+  });
+  return collected;
 }
 
 function walkJson(value, visit) {
@@ -204,56 +296,126 @@ function walkJson(value, visit) {
   Object.values(value).forEach((child) => walkJson(child, visit));
 }
 
-function looksLikeA101Product(raw) {
-  const attributes = raw.attributes && typeof raw.attributes === 'object' ? raw.attributes : {};
-  const name = raw.title || raw.name || raw.product_name || raw.seo_name || attributes.name;
-  const identity = raw.id || raw.baseId || raw.sku || raw.barcode || attributes.barcode || attributes.Barkod;
-  const productData = raw.price || raw.images || raw.image || raw.category || raw.brand || raw.seoUrl || attributes.url;
-  return Boolean(name && identity && productData);
-}
-
-function normalizeA101Product(raw) {
-  const attributes = raw.attributes && typeof raw.attributes === 'object' ? raw.attributes : {};
-  const barcode = normalizeBarcodeKey(
-    raw.barcode || raw.gtin13 || raw.gtin || attributes.barcode || attributes.Barkod || attributes.GTIN || attributes.EAN
-  );
-  const sku = normalizeBarcodeKey(raw.id || raw.baseId || raw.sku || attributes.productId);
-  const name = cleanText(raw.title || raw.name || raw.product_name || raw.seo_name || attributes.name);
-  const brand = cleanText(raw.brand || attributes.brandLabel || attributes.brand || raw.Marka);
-  const category = cleanText(raw.category || attributes.category || attributes.cl2 || attributes.cl1);
-  const imageUrl = extractA101Image(raw);
-  let url = cleanText(raw.seoUrl || raw.link || raw.url || attributes.url);
-  if (url.startsWith('/')) url = `https://www.a101.com.tr${url}`;
-  if (!url && sku) url = `https://www.a101kapida.com/product/${sku}`;
+function normalizeKapidaProduct(raw) {
+  const images = raw.image || raw.images || raw.imageUrl || raw.image_url;
+  let imageUrl = '';
+  if (typeof images === 'string') imageUrl = images;
+  else if (Array.isArray(images)) {
+    const preferred = images.find((item) => item?.imageType === 'product') || images[0];
+    imageUrl = typeof preferred === 'string' ? preferred : (preferred?.url || preferred?.src || '');
+  } else if (images && typeof images === 'object') {
+    imageUrl = images.url || images.src || '';
+  }
 
   return {
-    id: barcode || sku,
-    sku,
-    barcode,
-    name,
-    brand,
-    category,
+    sku: normalizeBarcodeKey(raw.id || raw.sku || raw.productId),
+    name: cleanText(raw.title || raw.name || raw.product_name),
+    brand: cleanText(raw.brand || raw.brands || ''),
+    category: cleanText(raw.category || raw.category_name || ''),
     imageUrl,
-    url,
-    price: parseA101Price(raw.price || attributes.discountedText),
-    source: 'a101-live'
+    url: cleanText(raw.link || raw.url || raw.seoUrl || ''),
+    price: parseProductPrice(raw.price ?? raw.current_price ?? raw.discounted_price),
+    available: raw.available !== false && raw.inStock !== false
   };
 }
 
-function extractA101Image(raw) {
-  const images = raw.images || raw.image || raw.imageUrl || raw.image_url;
-  if (typeof images === 'string') return images;
-  if (images && !Array.isArray(images) && typeof images === 'object') return images.url || images.src || '';
-  if (!Array.isArray(images)) return '';
-  const preferred = images.find((item) => item && typeof item === 'object' && item.imageType === 'product') || images[0];
-  return typeof preferred === 'string' ? preferred : (preferred?.url || preferred?.src || '');
+function chooseBestKapidaMatch(products, query, brandHint) {
+  if (!products.length) return null;
+  const queryTokens = productTokens(query);
+  const brandTokens = productTokens(brandHint);
+  const queryQuantities = extractQuantities(query);
+
+  const ranked = products.map((product) => {
+    const titleTokens = productTokens(product.name);
+    const titleSet = new Set(titleTokens);
+    const tokenMatches = queryTokens.filter((token) => titleSet.has(token)).length;
+    const coverage = queryTokens.length ? tokenMatches / queryTokens.length : 0;
+    const precision = titleTokens.length ? tokenMatches / titleTokens.length : 0;
+    const brandMatch = brandTokens.length && brandTokens.some((token) => titleSet.has(token)) ? 0.18 : 0;
+    const titleQuantities = extractQuantities(product.name);
+    const quantityMatch = queryQuantities.length
+      ? (queryQuantities.some((quantity) => titleQuantities.includes(quantity)) ? 0.32 : -0.22)
+      : 0;
+    const availability = product.available ? 0.03 : -0.08;
+    return { product, score: coverage * 0.62 + precision * 0.18 + brandMatch + quantityMatch + availability };
+  }).sort((left, right) => right.score - left.score);
+
+  return ranked[0]?.score >= 0.48 ? ranked[0].product : null;
 }
 
-function parseA101Price(value) {
+function productTokens(value) {
+  const ignored = new Set([
+    've', 'ile', 'icin', 'için', 'adet', 'paket', 'urun', 'ürün', 'sivi', 'sıvı',
+    'deterjani', 'deterjanı', 'aromali', 'aromalı', 'cesitleri', 'çeşitleri'
+  ]);
+  return normalizeSearch(value).split(/\s+/).filter((token) => token.length > 1 && !ignored.has(token));
+}
+
+function extractQuantities(value) {
+  const normalized = normalizeSearch(value).replace(/\s+/g, ' ');
+  const matches = normalized.match(/\b\d+(?:[.,]\d+)?\s*(?:ml|l|lt|litre|g|gr|kg|li|lu)\b/g) || [];
+  return matches.map((item) => item.replace(/\s+/g, '').replace('litre', 'l').replace('lt', 'l').replace('gr', 'g'));
+}
+
+function mapKapidaProductToCounter(product, scannedBarcode) {
+  return {
+    barcode: normalizeBarcodeKey(scannedBarcode),
+    name: product.name,
+    brand: product.brand,
+    imageUrl: product.imageUrl,
+    source: 'a101-kapida',
+    a101Url: product.url || `${A101_SEARCH_BASE}${encodeURIComponent(product.name)}`,
+    category: product.category,
+    price: product.price,
+    a101Sku: product.sku
+  };
+}
+
+async function fetchUniversalProduct(barcode) {
+  const fields = [
+    'code', 'status', 'product_name', 'product_name_tr', 'brands',
+    'image_front_small_url', 'image_front_url', 'quantity'
+  ].join(',');
+
+  const urls = [
+    `https://world.openfoodfacts.org/api/v3/product/${encodeURIComponent(barcode)}?product_type=all&fields=${encodeURIComponent(fields)}`,
+    `https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(barcode)}.json?fields=${encodeURIComponent(fields)}`
+  ];
+
+  for (const url of urls) {
+    try {
+      const response = await fetchWithTimeout(url, 9000, {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store'
+      });
+      if (!response.ok) continue;
+      const payload = await response.json();
+      const raw = payload.product || payload;
+      const baseName = cleanText(raw.product_name_tr || raw.product_name || raw.name);
+      if (!baseName) continue;
+      const quantity = cleanText(raw.quantity);
+      const name = quantity && !normalizeSearch(baseName).includes(normalizeSearch(quantity))
+        ? `${baseName} ${quantity}`
+        : baseName;
+      return {
+        barcode,
+        name,
+        brand: cleanText(raw.brands || raw.brand),
+        imageUrl: raw.image_front_small_url || raw.image_front_url || raw.image_url || '',
+        source: 'openfacts'
+      };
+    } catch (_) {
+      // Try the next open product database endpoint.
+    }
+  }
+
+  return null;
+}
+
+function parseProductPrice(value) {
   if (value && typeof value === 'object') {
-    const raw = value.discounted ?? value.normal ?? value.price ?? value.value;
-    if (Number.isInteger(raw) && raw >= 1000) return raw / 100;
-    value = raw;
+    value = value.discounted ?? value.normal ?? value.price ?? value.value;
+    if (Number.isInteger(value) && value >= 1000) return value / 100;
   }
   if (value == null || value === '') return null;
   const textValue = String(value).replace(/₺|TL/gi, '').trim();
@@ -262,57 +424,6 @@ function parseA101Price(value) {
     : textValue;
   const number = Number.parseFloat(normalized.replace(/[^\d.]/g, ''));
   return Number.isFinite(number) && number > 0 ? number : null;
-}
-
-function mapLiveA101Product(product, scannedBarcode) {
-  return {
-    barcode: normalizeBarcodeKey(scannedBarcode || product.barcode || product.sku),
-    name: product.name,
-    brand: product.brand,
-    imageUrl: product.imageUrl,
-    source: 'a101-live',
-    a101Url: product.url || `${A101_SEARCH_BASE}${encodeURIComponent(product.name)}`,
-    category: product.category,
-    price: product.price,
-    a101Sku: product.sku,
-    gtin: product.barcode
-  };
-}
-
-async function fetchOpenFoodFacts(barcode) {
-  const fields = [
-    'code', 'status', 'product_name', 'product_name_tr', 'brands',
-    'image_front_small_url', 'image_front_url', 'quantity'
-  ].join(',');
-
-  try {
-    const response = await fetchWithTimeout(
-      `${OPEN_FOOD_FACTS_ENDPOINT}${encodeURIComponent(barcode)}.json?fields=${encodeURIComponent(fields)}`,
-      9000,
-      { headers: { Accept: 'application/json' }, cache: 'no-store' }
-    );
-    if (!response.ok) return null;
-
-    const payload = await response.json();
-    if (payload.status !== 1 || !payload.product) return null;
-    const raw = payload.product;
-    const baseName = cleanText(raw.product_name_tr || raw.product_name);
-    if (!baseName) return null;
-    const quantity = cleanText(raw.quantity);
-    const name = quantity && !normalizeSearch(baseName).includes(normalizeSearch(quantity))
-      ? `${baseName} ${quantity}`
-      : baseName;
-
-    return {
-      barcode,
-      name,
-      brand: cleanText(raw.brands),
-      imageUrl: raw.image_front_small_url || raw.image_front_url || '',
-      source: 'openfoodfacts'
-    };
-  } catch (_) {
-    return null;
-  }
 }
 
 async function queueProductLookup(item) {
@@ -334,7 +445,7 @@ async function queueProductLookup(item) {
       const { error } = await state.supabase.from('product_lookup_queue').upsert(queued, { onConflict: 'barcode' });
       if (!error) return;
     } catch (_) {
-      // Fall back to the local queue when the optional queue table is not installed yet.
+      // Fall back to local queue if the optional queue table is not installed.
     }
   }
 
@@ -343,7 +454,9 @@ async function queueProductLookup(item) {
   if (current) {
     current.name_hint = queued.name_hint || current.name_hint;
     current.brand_hint = queued.brand_hint || current.brand_hint;
+    current.status = 'pending';
     current.next_attempt_at = new Date().toISOString();
+    current.updated_at = new Date().toISOString();
   } else {
     localQueue.push(queued);
   }
@@ -352,21 +465,29 @@ async function queueProductLookup(item) {
 
 async function processLookupQueue(force = false) {
   if (catalogState.queueRunning || !navigator.onLine) return;
-  catalogState.queueRunning = true;
+  const settings = loadRafApiSettings();
+  if (!settings.parseApiKey) {
+    renderLearnedCatalog();
+    return;
+  }
 
+  catalogState.queueRunning = true;
   try {
     const items = await getQueuedLookups(force);
-    for (const item of items.slice(0, 8)) {
-      let found = await findA101Product(item.barcode, item.barcode);
-      if (!found && item.name_hint) found = await findA101Product(item.name_hint, item.barcode);
+    const item = items.find((candidate) => cleanText(candidate.name_hint));
+    if (!item) return;
 
-      if (found) {
-        const product = mapLiveA101Product(found, item.barcode);
+    try {
+      const match = await searchA101Kapida(item.name_hint, item.brand_hint);
+      if (match) {
+        const product = mapKapidaProductToCounter(match, item.barcode);
         await persistProduct(product);
         await completeQueuedLookup(item.barcode);
       } else {
-        await postponeQueuedLookup(item);
+        await postponeQueuedLookup(item, 'Eşleşme bulunamadı');
       }
+    } catch (error) {
+      await postponeQueuedLookup(item, friendlyCatalogError(error));
     }
 
     await loadLearnedProducts();
@@ -392,8 +513,7 @@ async function getQueuedLookups(force) {
       // Use local queue below.
     }
   }
-
-  return loadLocalQueue().filter((item) => force || !item.next_attempt_at || item.next_attempt_at <= now);
+  return loadLocalQueue().filter((item) => item.status === 'pending' && (force || !item.next_attempt_at || item.next_attempt_at <= now));
 }
 
 async function completeQueuedLookup(barcode) {
@@ -408,17 +528,21 @@ async function completeQueuedLookup(barcode) {
   removeQueuedLookup(barcode);
 }
 
-async function postponeQueuedLookup(item) {
+async function postponeQueuedLookup(item, lastError) {
   const attempts = (Number(item.attempts) || 0) + 1;
-  const delayMinutes = Math.min(360, 5 * (2 ** Math.min(attempts, 6)));
-  const nextAttempt = new Date(Date.now() + delayMinutes * 60_000).toISOString();
+  const failed = attempts >= 3;
+  const delayHours = Math.min(48, 2 ** attempts);
+  const nextAttempt = new Date(Date.now() + delayHours * 3_600_000).toISOString();
+  const update = {
+    attempts,
+    status: failed ? 'failed' : 'pending',
+    next_attempt_at: nextAttempt,
+    updated_at: new Date().toISOString()
+  };
 
   if (state.supabase) {
     try {
-      const { error } = await state.supabase
-        .from('product_lookup_queue')
-        .update({ attempts, next_attempt_at: nextAttempt, updated_at: new Date().toISOString() })
-        .eq('barcode', item.barcode);
+      const { error } = await state.supabase.from('product_lookup_queue').update(update).eq('barcode', item.barcode);
       if (!error) return;
     } catch (_) {
       // Update local queue below.
@@ -428,9 +552,7 @@ async function postponeQueuedLookup(item) {
   const queue = loadLocalQueue();
   const current = queue.find((entry) => entry.barcode === item.barcode);
   if (current) {
-    current.attempts = attempts;
-    current.next_attempt_at = nextAttempt;
-    current.updated_at = new Date().toISOString();
+    Object.assign(current, update, { last_error: lastError });
     saveLocalQueue(queue);
   }
 }
@@ -503,7 +625,7 @@ function normalizeLearnedProduct(raw) {
 
 function productRichness(product) {
   return ['name', 'brand', 'imageUrl', 'url'].reduce((score, key) => score + (product[key] ? 1 : 0), 0)
-    + (product.source === 'a101-live' ? 3 : 0);
+    + (product.source === 'a101-kapida' ? 3 : 0);
 }
 
 function renderLearnedCatalog() {
@@ -531,7 +653,7 @@ function renderLearnedCatalog() {
   if (!shown.length) {
     empty.textContent = catalogState.products.length
       ? 'Aramana uygun öğrenilmiş ürün bulunamadı.'
-      : 'Henüz ürün öğrenilmedi. Bir raf ürününün barkodunu okut; bulunduğunda buraya ve ortak veritabanına kaydedilir.';
+      : 'Henüz ürün öğrenilmedi. Bir raf ürününün barkodunu okut; ilk sefer ürün adını yazıp A101 rafında bul.';
   }
 
   moreButton.classList.toggle('hidden', filtered.length <= catalogState.visible);
@@ -540,8 +662,13 @@ function renderLearnedCatalog() {
     button.addEventListener('click', () => selectLearnedProduct(button.dataset.selectProduct));
   });
 
-  const queueCount = loadLocalQueue().length;
-  setCatalogStatus(`${catalogState.products.length.toLocaleString('tr-TR')} ürün öğrenildi${queueCount ? ` • ${queueCount} barkod tekrar aranacak` : ''}.`);
+  const localQueue = loadLocalQueue();
+  const pending = localQueue.filter((item) => item.status === 'pending').length;
+  const apiReady = Boolean(loadRafApiSettings().parseApiKey);
+  const parts = [`${catalogState.products.length.toLocaleString('tr-TR')} ürün öğrenildi`];
+  if (pending) parts.push(`${pending} barkod sırada`);
+  if (!apiReady) parts.push('A101 raf API anahtarı eklenmedi');
+  setCatalogStatus(`${parts.join(' • ')}.`);
 }
 
 function renderLearnedProduct(product) {
@@ -549,10 +676,10 @@ function renderLearnedProduct(product) {
   const image = product.imageUrl
     ? `<img class="catalog-product-image" src="${escapeAttribute(product.imageUrl)}" alt="" loading="lazy" />`
     : '<div class="catalog-product-placeholder">A101</div>';
-  const source = product.source === 'a101-live'
-    ? 'A101’den bulundu'
-    : product.source === 'openfoodfacts'
-      ? 'Genel barkod verisi'
+  const source = product.source === 'a101-kapida'
+    ? 'A101 Kapıda rafından bulundu'
+    : product.source === 'openfacts'
+      ? 'Açık barkod verisi'
       : 'Elle öğrenildi';
   const meta = [product.brand, source, `Barkod: ${product.barcode}`].filter(Boolean).map(escapeHtml).join(' • ');
 
@@ -587,8 +714,8 @@ window.showProduct = function showProductWithLookupSource(product, manual) {
   originalShowProduct(product, manual);
 
   const sourceLabels = {
-    'a101-live': 'A101 raf kataloğundan canlı bulundu',
-    openfoodfacts: 'Genel barkod veritabanında bulundu',
+    'a101-kapida': 'A101 Kapıda raf kataloğunda bulundu',
+    openfacts: 'Açık barkod veritabanında bulundu',
     manual: 'Elle eklendi'
   };
 
@@ -607,7 +734,7 @@ window.showProduct = function showProductWithLookupSource(product, manual) {
     els.productCard.querySelector('.product-summary').insertAdjacentElement('afterend', link);
   }
   link.href = product.a101Url || `${A101_SEARCH_BASE}${encodeURIComponent(product.name || product.barcode)}`;
-  link.textContent = product.source === 'a101-live' ? 'A101 ürün sayfasını aç' : 'A101’de ara';
+  link.textContent = product.source === 'a101-kapida' ? 'A101 raf ürününü aç' : 'A101’de ara';
   link.classList.toggle('hidden', manual && !product.name);
 };
 
@@ -628,18 +755,12 @@ function normalizeBarcodeKey(value) {
   return String(value || '').replace(/\D/g, '');
 }
 
-function barcodesEqual(left, right) {
-  const a = normalizeBarcodeKey(left).replace(/^0+/, '');
-  const b = normalizeBarcodeKey(right).replace(/^0+/, '');
-  return Boolean(a && b && a === b);
-}
-
 function normalizeSearch(value) {
   return cleanText(value)
     .toLocaleLowerCase('tr-TR')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9çğıöşü]+/g, ' ')
+    .replace(/[^a-z0-9çğıöşü.,]+/g, ' ')
     .trim();
 }
 
