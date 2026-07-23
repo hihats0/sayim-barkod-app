@@ -3,19 +3,36 @@
 
 Uses the public unauthenticated WAW search service and public sitemap URLs.
 It deliberately avoids the slower listing-page crawl so every run completes
-within a predictable window. Push trigger revision: 2.
+within a predictable window. Push trigger revision: 3.
 """
 
 from __future__ import annotations
 
 import os
+from typing import Any
 
 import sync_a101_catalog as base
 import sync_a101_catalog_fast as fast
 
 
+def install_bounded_http_timeout(seconds: int) -> None:
+    original_get = fast.session.get
+
+    def bounded_get(*args: Any, **kwargs: Any):
+        requested = kwargs.get("timeout", seconds)
+        if isinstance(requested, (int, float)):
+            kwargs["timeout"] = min(float(requested), float(seconds))
+        else:
+            kwargs["timeout"] = seconds
+        return original_get(*args, **kwargs)
+
+    fast.session.get = bounded_get
+
+
 def main() -> int:
-    base.TIMEOUT = int(os.getenv("A101_HTTP_TIMEOUT", "12"))
+    http_timeout = int(os.getenv("A101_HTTP_TIMEOUT", "8"))
+    base.TIMEOUT = http_timeout
+    install_bounded_http_timeout(http_timeout)
     products: list[dict] = []
 
     parse_key = os.getenv("PARSE_API_KEY", "").strip()
